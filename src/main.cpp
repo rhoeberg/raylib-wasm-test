@@ -36,7 +36,7 @@ void UpdateDrawFrame();
 
 int two_numbers[2];
 extern "C" {
-	extern int *my_js();
+	// extern int *my_js();
 	extern int get_window_height();
 	extern int get_window_width();
 
@@ -45,16 +45,6 @@ extern "C" {
 	}
 }
 
-Shader bgShader;
-int window_width;
-int window_height;
-
-// struct TileTextureList {
-// 	int capacity;
-// 	int count;
-// 	Texture2D *textures;
-// };
-// TileTextureList tileTextureList;
 enum TileType {
 	TILE_EMPTY,
 	TILE_TEXTURE,
@@ -71,20 +61,30 @@ struct Tile {
 	int alpha;
 };
 
+struct GameState {
+	bool coral_activated;
+	int coral_animation_x;
+	int coral_animation_y;
+	int coral_animation_done;
+
+	Texture2D dolphinSheet;
+	int dolphinSheetHorizontalCount;
+	int dolphinSheetWidth;
+	int dolphinSheetHorizontalStep;
+};
+
+#define TILE_MAP_SIZE 40
+#define CORAL_ANIMATION_SPEED 5
+// #define TILE_MAP_STEP 60
+
+Shader bgShader;
+int window_width;
+int window_height;
+GameState state;
 std::vector<Texture2D> tileTextures;
 std::vector<Tile> tiles;
-#define TILE_MAP_SIZE 100
-#define TILE_MAP_STEP 50
 Tile tileMap[TILE_MAP_SIZE][TILE_MAP_SIZE];
-
 FastNoiseLite noise;
-
-// struct TileList {
-// 	int capacity;
-// 	int count;
-// 	Tile *tiles;
-// };
-// TileList tileList;
 
 void setup()
 {
@@ -145,6 +145,15 @@ int main(void)
 	SetWindowSize(window_width - 15, window_height - 20);
 	setup();
 
+
+	state = {};
+
+	Image dImage = LoadImage("assets/images/dolphinpod_sprite.png");
+	if(dImage.date != NULL) {
+		state.dolphinSheet = LoadTextureFromImage(dImage);
+	}
+
+
 	// tileTextureList.textures = (Texture2D*)malloc(100 * sizeof(Texture2D));
 	// tileTextureList.capacity = 100;
 
@@ -166,49 +175,6 @@ int main(void)
 	}
 	printf("tile texture amount:%d\n", tileTextures.size());
 
-	// int step = 50;
-	// for(int x = 0; x < 50; x++) {
-	// 	for(int y = 0; y < 50; y++) {
-	// 		Tile tile;
-
-	// 		int rnd = GetRandomValue(0, tileTextures.size()-1);
-	// 		tile.textureId = rnd;
-
-	// 		float noiseFreq = 7;
-	// 		float n = noise.GetNoise((float)x * noiseFreq, (float)y * noiseFreq);
-	// 		n += 1;
-	// 		n *= 0.5;
-	// 		tile.alpha = (int)(n * 256);
-
-	// 		printf("%f\n", n);
-
-	// 		if(n < 0.2f) {
-	// 			tile.type = TILE_EMPTY;
-	// 		}
-	// 		else {
-	// 			tile.type = TILE_TEXTURE;
-	// 			tile.x = x * step;
-	// 			tile.y = y * step;
-	// 			int size = GetRandomValue(50, 200);
-	// 			tile.width = size;
-	// 			tile.height = size;
-	// 			tile.rotation = (float)GetRandomValue(0, 360);
-	// 			tiles.push_back(tile);
-
-	// 			printf("tile texture id, %d\n", tile.textureId);
-	// 			printf("tile type, %d\n", tile.type);
-	// 			printf("tile pos, %d, %d\n", tile.x, tile.y);
-	// 			printf("tile size, %d, %d\n", tile.width, tile.height);
-	// 			printf("tile alpha, %d\n", tile.alpha);
-	// 		}
-	// 	}
-	// }
-
-	// for(int x = 0; x < TILE_MAP_SIZE; x++) {
-	// 	for(int y = 0; y < TILE_MAP_SIZE; y++) {
-
-	// 	}
-	// }
 	
 
 #if defined(PLATFORM_WEB)
@@ -278,71 +244,114 @@ float GetBezierForCorals(float t) {
 	return result;
 }
 
-void UpdateDrawFrame()
+void DrawCoral()
 {
-	// emscripten_run_script("my_js()");
-	// int *n = my_js();
+	Vector2 pos = GetMousePosition();
 
-	// TODO (rhoe) this should only run once
-	if(IsMouseButtonDown(0)) {
-		// DrawText("ttt", 190, 200, 20, BLACK);
+	int tile_map_x = pos.x / 50;
+	int tile_map_y = pos.y / 50;
 
-		Vector2 pos = GetMousePosition();
+	for(int x = -2; x < 4; x++) {
+		for(int y = -2; y < 4; y++) {
 
-		int tile_map_x = pos.x / TILE_MAP_STEP;
-		int tile_map_y = pos.y / TILE_MAP_STEP;
+			int pos_x = x + tile_map_x;
+			int pos_y = y + tile_map_y;
 
-		for(int x = -2; x < 4; x++) {
-			for(int y = -2; y < 4; y++) {
+			if(pos_x >= 0 &&
+			   pos_x < TILE_MAP_SIZE &&
+			   pos_y >= 0 &&
+			   pos_y < TILE_MAP_SIZE) {
+				const char *id = TextFormat("%f, %f\n", pos.x, pos.y);
+				Tile tile;
+				int rnd = GetRandomValue(0, tileTextures.size()-1);
+				tile.textureId = rnd;
+				float noiseFreq = 7;
+				float n = noise.GetNoise((float)pos_x * noiseFreq, (float)pos_y * noiseFreq);
+				n += 1;
+				n *= 0.5;
+				n = GetBezierForCorals(n);
 
-				int pos_x = x + tile_map_x;
-				int pos_y = y + tile_map_y;
-
-				if(pos_x >= 0 &&
-				   pos_x < TILE_MAP_SIZE &&
-				   pos_y >= 0 &&
-				   pos_y < TILE_MAP_SIZE) {
-
-					// int t = GetTouchPointCount();
-					const char *id = TextFormat("%f, %f\n", pos.x, pos.y);
-					// DrawText(id, 190, 220, 20, BLACK);
-
-					Tile tile;
-					int rnd = GetRandomValue(0, tileTextures.size()-1);
-					tile.textureId = rnd;
-					float noiseFreq = 7;
-					// float n = noise.GetNoise(pos.x * noiseFreq, pos.y * noiseFreq);
-					float n = noise.GetNoise((float)pos_x * noiseFreq, (float)pos_y * noiseFreq);
-					n += 1;
-					n *= 0.5;
-					n = GetBezierForCorals(n);
-
-					tile.alpha = (int)(n * 256);
-					if(n < 0.0f) {
-						tile.type = TILE_EMPTY;
-					}
-					else {
-						tile.type = TILE_TEXTURE;
-						// tile.x = (int)pos.x;
-						// tile.y = (int)pos.y;
-						int size = GetRandomValue(100, 150);
-						tile.width = size;
-						tile.height = size;
-						tile.rotation = (float)GetRandomValue(0, 360);
-						// tiles.push_back(tile);
-						tileMap[pos_x][pos_y] = tile;
-					}
+				tile.alpha = (int)(n * 256);
+				if(n < 0.0f) {
+					tile.type = TILE_EMPTY;
+				}
+				else {
+					tile.type = TILE_TEXTURE;
+					int size = GetRandomValue(100, 150);
+					tile.width = size;
+					tile.height = size;
+					tile.rotation = (float)GetRandomValue(0, 360);
+					tileMap[pos_x][pos_y] = tile;
 				}
 			}
 		}
+	}
+}
 
-		// printf("%zu mouse down\n", tiles.size());
-		// printf("tile texture id, %d\n", tile.textureId);
-		// printf("tile type, %d\n", tile.type);
-		// printf("tile pos, %d, %d\n", tile.x, tile.y);
-		// printf("tile size, %d, %d\n", tile.width, tile.height);
-		// printf("tile alpha, %d\n", tile.alpha);
-		
+void RunCoralAnimation()
+{
+	for(int i = 0; i < CORAL_ANIMATION_SPEED; i++) {
+
+		Tile tile;
+
+		int rnd = GetRandomValue(0, tileTextures.size()-1);
+		tile.textureId = rnd;
+
+		float noiseFreq = 7;
+		float n = noise.GetNoise((float)state.coral_animation_x * noiseFreq, (float)state.coral_animation_y * noiseFreq);
+		n += 1;
+		n *= 0.5;
+		tile.alpha = (int)(n * 256);
+
+		if(n < 0.2f) {
+			tile.type = TILE_EMPTY;
+		}
+		else {
+
+			float step_width = window_width / TILE_MAP_SIZE;
+			float step_height = window_height / TILE_MAP_SIZE;
+			tile.type = TILE_TEXTURE;
+			tile.x = state.coral_animation_x * step_width;
+			tile.y = (TILE_MAP_SIZE - state.coral_animation_y) * step_height;
+			int size = GetRandomValue(50, 200);
+			tile.width = size;
+			tile.height = size;
+			tile.rotation = (float)GetRandomValue(0, 360);
+			tiles.push_back(tile);
+		}
+
+		// ANIMATION TICK
+		if(state.coral_animation_x < TILE_MAP_SIZE) {
+			state.coral_animation_x++;
+		}
+		else {
+			if(state.coral_animation_y < TILE_MAP_SIZE) {
+				state.coral_animation_x = 0;
+				state.coral_animation_y++;
+			}
+			else {
+				// animation done
+				state.coral_animation_done = true;
+				return;
+			}
+		}
+	}
+
+}
+
+void UpdateDrawFrame()
+{
+	if(IsMouseButtonDown(0)) {
+		// DrawCoral();
+
+		if(!state.coral_activated) {
+			state.coral_activated = true;
+			state.coral_animation_done = false;
+		}
+	}
+
+	if(state.coral_activated && !state.coral_animation_done) {
+		RunCoralAnimation();
 	}
 
 
@@ -354,57 +363,57 @@ void UpdateDrawFrame()
 	EndShaderMode();
 
 
-	// for(int i = 0; i < tiles.size(); i++) {
-	// 	// DrawTexture(tileTextures[tiles[i].textureId], tiles[i].x, tiles[i].y, WHITE);
-	// 	if(tiles[i].type != TILE_EMPTY) {
-	// 		// printf("%d\n", tiles[i].alpha);
+	for(int i = 0; i < tiles.size(); i++) {
+		// DrawTexture(tileTextures[tiles[i].textureId], tiles[i].x, tiles[i].y, WHITE);
+		if(tiles[i].type != TILE_EMPTY) {
+			// printf("%d\n", tiles[i].alpha);
 
-	// 		Texture2D *texture = &tileTextures[tiles[i].textureId];
-	// 		Rectangle rectSrc;
-	// 		rectSrc.width = texture->width;
-	// 		rectSrc.height = texture->height;
-	// 		rectSrc.x = 0;
-	// 		rectSrc.y = 0;
+			Texture2D *texture = &tileTextures[tiles[i].textureId];
+			Rectangle rectSrc;
+			rectSrc.width = texture->width;
+			rectSrc.height = texture->height;
+			rectSrc.x = 0;
+			rectSrc.y = 0;
 
-	// 		Rectangle rectDst;
-	// 		rectDst.width = tiles[i].width; 
-	// 		rectDst.height = tiles[i].height; 
-	// 		rectDst.x = tiles[i].x;
-	// 		rectDst.y = tiles[i].y;
+			Rectangle rectDst;
+			rectDst.width = tiles[i].width; 
+			rectDst.height = tiles[i].height; 
+			rectDst.x = tiles[i].x;
+			rectDst.y = tiles[i].y;
 
-	// 		Vector2 origin = Vector2{(float)tiles[i].width / 2, (float)tiles[i].height / 2};
+			Vector2 origin = Vector2{(float)tiles[i].width / 2, (float)tiles[i].height / 2};
 
-	// 		Color color = WHITE;
-	// 		color.a = tiles[i].alpha;
-	// 		DrawTexturePro(*texture, rectSrc, rectDst, origin, tiles[i].rotation, color);
-	// 	}
-	// }
-
-	for(int x = 0; x < TILE_MAP_SIZE; x++) {
-		for(int y = 0; y < TILE_MAP_SIZE; y++) {
-			Tile *tile = &tileMap[x][y];
-			if(tile->type != TILE_EMPTY) {
-				Texture2D *texture = &tileTextures[tile->textureId];
-				Rectangle rectSrc;
-				rectSrc.width = texture->width;
-				rectSrc.height = texture->height;
-				rectSrc.x = 0;
-				rectSrc.y = 0;
-
-				Rectangle rectDst;
-				rectDst.width = tile->width; 
-				rectDst.height = tile->height; 
-				rectDst.x = x * TILE_MAP_STEP;
-				rectDst.y = y * TILE_MAP_STEP;
-
-				Vector2 origin = Vector2{(float)tile->width / 2, (float)tile->height / 2};
-
-				Color color = WHITE;
-				color.a = tile->alpha;
-				DrawTexturePro(*texture, rectSrc, rectDst, origin, tile->rotation, color);
-			}
+			Color color = WHITE;
+			color.a = tiles[i].alpha;
+			DrawTexturePro(*texture, rectSrc, rectDst, origin, tiles[i].rotation, color);
 		}
 	}
+
+	// for(int x = 0; x < TILE_MAP_SIZE; x++) {
+	// 	for(int y = 0; y < TILE_MAP_SIZE; y++) {
+	// 		Tile *tile = &tileMap[x][y];
+	// 		if(tile->type != TILE_EMPTY) {
+	// 			Texture2D *texture = &tileTextures[tile->textureId];
+	// 			Rectangle rectSrc;
+	// 			rectSrc.width = texture->width;
+	// 			rectSrc.height = texture->height;
+	// 			rectSrc.x = 0;
+	// 			rectSrc.y = 0;
+
+	// 			Rectangle rectDst;
+	// 			rectDst.width = tile->width; 
+	// 			rectDst.height = tile->height; 
+	// 			rectDst.x = x * TILE_MAP_STEP;
+	// 			rectDst.y = y * TILE_MAP_STEP;
+
+	// 			Vector2 origin = Vector2{(float)tile->width / 2, (float)tile->height / 2};
+
+	// 			Color color = WHITE;
+	// 			color.a = tile->alpha;
+	// 			DrawTexturePro(*texture, rectSrc, rectDst, origin, tile->rotation, color);
+	// 		}
+	// 	}
+	// }
 
 	EndDrawing();
 }
